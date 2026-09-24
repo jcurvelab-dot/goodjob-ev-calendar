@@ -37,6 +37,48 @@ a{color:#1d4ed8;text-decoration:none}
 .filters input,.filters select{flex:1;min-width:110px;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12.5px;background:#fff;font-family:inherit}
 .clock{min-width:220px;background:#0b1220;color:#e2e8f0;border-radius:12px;padding:10px 12px;font-variant-numeric:tabular-nums;font-size:12px;line-height:1.35}
 .clock b{color:#7dd3fc;font-size:20px;font-weight:800;letter-spacing:0.2px}
+/* clock date / hour / minute / second */
+.date{
+  color:#ffffff;
+  font-weight:600;
+}
+.hm{
+  color:#e0f2fe;
+  font-size:1.35em;
+  font-weight:800;
+  letter-spacing:0.5px;
+  display:inline-block;
+  vertical-align:baseline;
+}
+.sec{
+  color:#fbbf24;
+  font-size:1.45em;
+  font-weight:900;
+  letter-spacing:0.5px;
+  display:inline-block;
+  vertical-align:baseline;
+}
+.clock b .date, #practiceModal .bigclock .date{
+  color:#ffffff;
+  font-weight:600;
+}
+.clock b .hm, #practiceModal .bigclock .hm{
+  color:#e0f2fe;
+  font-size:1.35em;
+  font-weight:800;
+  letter-spacing:0.5px;
+  display:inline-block;
+  vertical-align:baseline;
+}
+.clock b .sec, #practiceModal .bigclock .sec{
+  color:#fbbf24;
+  font-size:1.45em;
+  font-weight:900;
+  letter-spacing:0.5px;
+  display:inline-block;
+  vertical-align:baseline;
+}
+
 .clock .st{color:#94a3b8;font-size:11px;margin-top:3px}
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--muted);font-weight:600}
 .sw{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
@@ -252,24 +294,7 @@ footer{margin-top:14px;text-align:center;color:var(--muted);font-size:11px;line-
 #practiceModal .log{margin-top:10px;font-size:11px;color:#94a3b8;max-height:110px;overflow:auto}
 
 
-.clock b .min, #practiceModal .bigclock .min{
-  color:#3b82f6;
-  font-size:1.2em;
-  font-weight:700;
-  letter-spacing:0.5px;
-  display:inline-block;
-  vertical-align:baseline;
-}
-.clock b .sec, #practiceModal .bigclock .sec{
-  color:#fbbf24;
-  font-size:1.45em;
-  font-weight:900;
-  letter-spacing:0.5px;
-  display:inline-block;
-  vertical-align:baseline;
-}
-
-.verchip{
+.clock b .min, #practiceModal .bigclock .clock b .sec, #practiceModal .bigclock .verchip{
   display:inline-block; margin-left:6px; padding:2px 7px; border-radius:999px;
   font-size:10px; font-weight:700; vertical-align:middle;
   background:#e0e7ff; color:#1e3a8a; border:1px solid #c7d2fe; letter-spacing:0;
@@ -348,7 +373,7 @@ footer{margin-top:14px;text-align:center;color:var(--muted);font-size:11px;line-
 
 <div class="wrap app-root locked" id="appRoot">
   <header class="bar">
-    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.9</span></h1>
+    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.10</span></h1>
     <p class="sub tip">매일 7시 · 13시 · 17시 업데이트됩니다. 최신화 버튼을 눌러 주세요.</p>
     <p class="sub tip muted">지역을 선택하면 아래에 고객 공유가 나타납니다. 보라 점선=공고예정(접수 확정 아님). 공유 이름·연락처는 설정에서 변경.</p>
     <div class="row">
@@ -604,7 +629,7 @@ const HOLIDAYS = {"2026-01-01": "신정", "2026-02-16": "설 연휴", "2026-02-1
 var LIVE = DATA;
 let DEALER = {};
 let rows = (LIVE && LIVE.rows) ? LIVE.rows.slice() : [];
-const APP_VER = "1.1.9";
+const APP_VER = "1.1.10";
 const APP_VER_RAW = 'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/version.json';
 const APP_VER_CDN = 'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_CDN2 = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
@@ -1581,8 +1606,10 @@ function formatKSTHtml(ms){
   const y=get('year'), mo=get('month'), d=get('day');
   const hh=get('hour'), mm=get('minute'), ss=get('second');
   const msec = pad3(Math.floor(ms % 1000));
-  return y+'. '+Number(mo)+'. '+Number(d)+'. '+hh+':<span class="min">'+mm+'</span>:<span class="sec">'+ss+'</span>.'+msec;
+  return '<span class="date">'+y+'. '+Number(mo)+'. '+Number(d)+'.</span> <span class="hm">'+hh+'</span>:<span class="hm">'+mm+'</span>:<span class="sec">'+ss+'</span>.'+msec;
 }
+
+
 function tick(){
   const el = document.getElementById('srvClock');
   if (el) el.innerHTML = formatKSTHtml(Date.now()+clockOffsetSec*1000);
