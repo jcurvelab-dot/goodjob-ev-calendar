@@ -348,7 +348,7 @@ footer{margin-top:14px;text-align:center;color:var(--muted);font-size:11px;line-
 
 <div class="wrap app-root locked" id="appRoot">
   <header class="bar">
-    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.8</span></h1>
+    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.9</span></h1>
     <p class="sub tip">매일 7시 · 13시 · 17시 업데이트됩니다. 최신화 버튼을 눌러 주세요.</p>
     <p class="sub tip muted">지역을 선택하면 아래에 고객 공유가 나타납니다. 보라 점선=공고예정(접수 확정 아님). 공유 이름·연락처는 설정에서 변경.</p>
     <div class="row">
@@ -604,11 +604,26 @@ const HOLIDAYS = {"2026-01-01": "신정", "2026-02-16": "설 연휴", "2026-02-1
 var LIVE = DATA;
 let DEALER = {};
 let rows = (LIVE && LIVE.rows) ? LIVE.rows.slice() : [];
-const APP_VER = "1.1.8";
+const APP_VER = "1.1.9";
 const APP_VER_RAW = 'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/version.json';
 const APP_VER_CDN = 'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_CDN2 = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_GHAPI = 'https://api.github.com/repos/jcurvelab-dot/goodjob-ev-calendar/contents/version.json?ref=main';
+
+
+function abortAfter(ms){
+  try {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      return AbortSignal.timeout(ms);
+    }
+  } catch (e0) {}
+  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  if (!ctrl) return undefined;
+  setTimeout(function(){ try { ctrl.abort(); } catch(e1){} }, ms|0);
+  return ctrl.signal;
+}
+
+
 const SCHEDULE_CACHE_KEY = 'goodjob_schedule_cache_v1';
 const SCHEDULE_META_KEY = 'goodjob_schedule_meta_v1';
 const FEED_CDN = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/schedule.json';
@@ -653,7 +668,7 @@ function saveScheduleCache(obj){
   } catch(e) {}
 }
 async function fetchOneSchedule(url, timeoutMs){
-  const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(timeoutMs || 12000) });
+  const res = await fetch(url, { cache: 'no-store', signal: abortAfter(timeoutMs || 12000) });
   if (!res.ok) throw new Error('HTTP '+res.status);
   const obj = await res.json();
   if (!obj || !Array.isArray(obj.rows) || !obj.rows.length) throw new Error('empty rows');
@@ -1441,7 +1456,7 @@ async function fetchAppVersionInfo(){
   async function tryUrl(u){
     const res = await fetch(u, {
       cache: 'no-store',
-      signal: AbortSignal.timeout(12000),
+      signal: abortAfter(12000),
       headers: u.indexOf('api.github.com') >= 0 ? { 'Accept': 'application/vnd.github.raw+json' } : undefined
     });
     if (!res.ok) throw new Error('HTTP '+res.status);
@@ -1523,7 +1538,7 @@ async function runAppUpdate(){
     for (let i=0;i<htmlUrls.length;i++){
       try {
         const u = htmlUrls[i] + (htmlUrls[i].indexOf('?')>=0?'&':'?') + 't=' + Date.now();
-        const res = await fetch(u, { cache: 'no-store', signal: AbortSignal.timeout(60000) });
+        const res = await fetch(u, { cache: 'no-store', signal: abortAfter(20000) });
         if (!res.ok) throw new Error('HTTP '+res.status);
         const body = await res.text();
         if (!body || body.length < 1024) throw new Error('파일이 너무 작습니다');
@@ -1656,18 +1671,51 @@ function wirePractice(){
 
 async function syncNavyism(){
   const status = document.getElementById('clockStatus');
+  const navyUrl = 'https://time.navyism.com/?host=ev.or.kr';
+  const sources = [
+    navyUrl,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(navyUrl),
+    'https://corsproxy.io/?' + encodeURIComponent(navyUrl)
+  ];
+  for (let i=0;i<sources.length;i++){
+    try{
+      const res = await fetch(sources[i], { cache:'no-store', signal: abortAfter(8000) });
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      const text = await res.text();
+      const m = text.match(/thisTime2\s*=\s*(\d+)/);
+      if (m){
+        clockOffsetSec = parseInt(m[1],10) - Math.floor(Date.now()/1000);
+        if (status) status.innerHTML = 'ev.or.kr 동기화됨 · <a href="'+navyUrl+'" target="_blank" rel="noopener">원본</a>';
+        tick(); return;
+      }
+    }catch(e){}
+  }
   try{
-    const res = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://time.navyism.com/?host=ev.or.kr'), {signal: AbortSignal.timeout(8000)});
-    const text = await res.text();
-    const m = text.match(/thisTime2\s*=\s*(\d+)/);
-    if (m){
-      clockOffsetSec = parseInt(m[1],10) - Math.floor(Date.now()/1000);
-      status.innerHTML = 'ev.or.kr 동기화됨 · <a href="https://time.navyism.com/?host=ev.or.kr" target="_blank" rel="noopener">원본</a>';
-      tick(); return;
+    const res = await fetch(FEED_CDN_PIN + '?t=' + Date.now(), { method:'HEAD', cache:'no-store', signal: abortAfter(8000) });
+    const dh = res.headers.get('date') || res.headers.get('Date');
+    if (dh){
+      const ms = Date.parse(dh);
+      if (!isNaN(ms)){
+        clockOffsetSec = Math.floor(ms/1000) - Math.floor(Date.now()/1000);
+        if (status) status.innerHTML = 'CDN시각 동기화 · <a href="'+navyUrl+'" target="_blank" rel="noopener">서버시각 원본</a>';
+        tick(); return;
+      }
+    }
+  }catch(e){}
+  try{
+    const res = await fetch(FEED_CDN + '?t=' + Date.now(), { method:'GET', cache:'no-store', signal: abortAfter(8000) });
+    const dh = res.headers.get('date') || res.headers.get('Date');
+    if (dh){
+      const ms = Date.parse(dh);
+      if (!isNaN(ms)){
+        clockOffsetSec = Math.floor(ms/1000) - Math.floor(Date.now()/1000);
+        if (status) status.innerHTML = 'CDN시각 동기화 · <a href="'+navyUrl+'" target="_blank" rel="noopener">서버시각 원본</a>';
+        tick(); return;
+      }
     }
   }catch(e){}
   clockOffsetSec = 0;
-  status.innerHTML = 'PC 한국시각 · <a href="https://time.navyism.com/?host=ev.or.kr" target="_blank" rel="noopener">서버시각 원본</a>';
+  if (status) status.innerHTML = 'PC 한국시각 · <a href="'+navyUrl+'" target="_blank" rel="noopener">서버시각 원본</a>';
 }
 syncNavyism();
 
