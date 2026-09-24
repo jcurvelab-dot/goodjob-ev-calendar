@@ -347,7 +347,7 @@ footer{margin-top:14px;text-align:center;color:var(--muted);font-size:11px;line-
 
 <div class="wrap app-root locked" id="appRoot">
   <header class="bar">
-    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.1</span></h1>
+    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.2</span></h1>
     <p class="sub tip">매일 7시 · 13시 · 17시 업데이트됩니다. 최신화 버튼을 눌러 주세요.</p>
     <p class="sub tip muted">지역을 선택하면 아래에 고객 공유가 나타납니다. 보라 점선=공고예정(접수 확정 아님). 공유 이름·연락처는 설정에서 변경.</p>
     <div class="row">
@@ -603,7 +603,7 @@ const HOLIDAYS = {"2026-01-01": "신정", "2026-02-16": "설 연휴", "2026-02-1
 var LIVE = DATA;
 let DEALER = {};
 let rows = (LIVE && LIVE.rows) ? LIVE.rows.slice() : [];
-const APP_VER = "1.1.1";
+const APP_VER = "1.1.2";
 const APP_VER_RAW = 'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/version.json';
 const APP_VER_CDN = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_CDN2 = 'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
@@ -1441,17 +1441,33 @@ async function runAppUpdate(){
     }
     const url = String(info.url || '');
     if (!url){ toast('업데이트 주소가 없습니다'); return; }
+    const htmlUrls = [
+      url,
+      'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/app/index.html',
+      'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/app/index.html',
+      'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/app/index.html'
+    ].filter(function(u, i, arr){ return u && arr.indexOf(u) === i; });
     if (hasAndroidBridge() && GoodjobAndroid.downloadAppUpdate){
       toast('앱 v' + remote + ' 받는 중…');
-      GoodjobAndroid.downloadAppUpdate(url);
+      // Android bridge takes one URL; prefer jsDelivr (raw.githubusercontent often blocked on mobile)
+      var prefer = htmlUrls.find(function(u){ return u.indexOf('jsdelivr.net') >= 0; }) || htmlUrls[0];
+      GoodjobAndroid.downloadAppUpdate(prefer);
       return;
     }
-    // Desktop: download HTML file
+    // Desktop: download HTML file (try mirrors)
     if (btn) btn.textContent = '⏳ 받는중…';
-    const res = await fetch(url + (url.indexOf('?')>=0?'&':'?') + 't=' + Date.now(), { cache: 'no-store', signal: AbortSignal.timeout(60000) });
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    const text = await res.text();
-    if (!text || text.length < 1024) throw new Error('파일이 너무 작습니다');
+    let text = null, lastErr = null;
+    for (let i=0;i<htmlUrls.length;i++){
+      try {
+        const u = htmlUrls[i] + (htmlUrls[i].indexOf('?')>=0?'&':'?') + 't=' + Date.now();
+        const res = await fetch(u, { cache: 'no-store', signal: AbortSignal.timeout(60000) });
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        const body = await res.text();
+        if (!body || body.length < 1024) throw new Error('파일이 너무 작습니다');
+        text = body; break;
+      } catch(e){ lastErr = e; }
+    }
+    if (!text) throw lastErr || new Error('다운로드 실패');
     downloadHtmlDesktop(text, remote);
     toast('GoodJob_v' + remote + '.html 저장됨 · 그 파일을 열어줘');
   } catch(e){
