@@ -252,10 +252,10 @@ footer{margin-top:14px;text-align:center;color:var(--muted);font-size:11px;line-
 #practiceModal .log{margin-top:10px;font-size:11px;color:#94a3b8;max-height:110px;overflow:auto}
 
 
-.clock b .hm, #practiceModal .bigclock .hm{
-  color:#7dd3fc;
-  font-size:1.6em;
-  font-weight:900;
+.clock b .min, #practiceModal .bigclock .min{
+  color:#3b82f6;
+  font-size:1.2em;
+  font-weight:700;
   letter-spacing:0.5px;
   display:inline-block;
   vertical-align:baseline;
@@ -348,7 +348,7 @@ footer{margin-top:14px;text-align:center;color:var(--muted);font-size:11px;line-
 
 <div class="wrap app-root locked" id="appRoot">
   <header class="bar">
-    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.7</span></h1>
+    <h1>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습 <span class="verchip" id="appVerChip">v1.1.8</span></h1>
     <p class="sub tip">매일 7시 · 13시 · 17시 업데이트됩니다. 최신화 버튼을 눌러 주세요.</p>
     <p class="sub tip muted">지역을 선택하면 아래에 고객 공유가 나타납니다. 보라 점선=공고예정(접수 확정 아님). 공유 이름·연락처는 설정에서 변경.</p>
     <div class="row">
@@ -604,7 +604,7 @@ const HOLIDAYS = {"2026-01-01": "신정", "2026-02-16": "설 연휴", "2026-02-1
 var LIVE = DATA;
 let DEALER = {};
 let rows = (LIVE && LIVE.rows) ? LIVE.rows.slice() : [];
-const APP_VER = "1.1.7";
+const APP_VER = "1.1.8";
 const APP_VER_RAW = 'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/version.json';
 const APP_VER_CDN = 'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_CDN2 = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
@@ -1399,37 +1399,68 @@ function cmpSemver(a, b){
   return 0;
 }
 async function fetchAppVersionInfo(){
-  const urls = [
-    APP_VER_GHAPI,
-    APP_VER_CDN + '?t=' + Date.now(),
-    APP_VER_CDN2 + '?t=' + Date.now(),
-    APP_VER_RAW + '?t=' + Date.now(),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(APP_VER_RAW + '?t=' + Date.now())
+  const stamp = Date.now();
+  const feedUrls = [
+    FEED_CDN_PIN + ('?t=' + stamp),
+    FEED_CDN + ('?t=' + stamp),
+    FEED_RAW + ('?t=' + stamp),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(FEED_RAW + '?t=' + stamp)
+  ];
+  const verUrls = [
+    APP_VER_CDN + '?t=' + stamp,
+    APP_VER_CDN2 + '?t=' + stamp,
+    APP_VER_RAW + '?t=' + stamp,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(APP_VER_RAW + '?t=' + stamp),
+    APP_VER_GHAPI
   ];
   let best = null;
   let lastErr = null;
-  for (let i=0;i<urls.length;i++){
-    try {
-      const res = await fetch(urls[i], {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(12000),
-        headers: urls[i].indexOf('api.github.com') >= 0 ? { 'Accept': 'application/vnd.github.raw+json' } : undefined
-      });
-      if (!res.ok) throw new Error('HTTP '+res.status);
-      let obj = null;
-      const ct = (res.headers.get('content-type') || '');
-      if (urls[i].indexOf('api.github.com') >= 0 && ct.indexOf('json') >= 0 && ct.indexOf('raw') < 0) {
-        const meta = await res.json();
-        if (meta && meta.content) {
-          try { obj = JSON.parse(atob(String(meta.content).replace(/
-/g, ''))); } catch (e1) { obj = null; }
-        }
-      } else {
-        obj = await res.json();
+  function consider(obj){
+    if (!obj) return;
+    // schedule.json hotUpdate channel
+    if (obj.hotUpdate && obj.hotUpdate.version && obj.hotUpdate.url){
+      const hu = {
+        version: String(obj.hotUpdate.version),
+        url: String(obj.hotUpdate.url),
+        commit: obj.hotUpdate.commit || '',
+        source: 'schedule.hotUpdate'
+      };
+      if (!best || cmpSemver(hu.version, best.version) > 0) best = hu;
+    }
+    // version.json shape
+    if (obj.version && obj.url){
+      const v = {
+        version: String(obj.version),
+        url: String(obj.url),
+        commit: obj.commit || '',
+        source: 'version.json'
+      };
+      if (!best || cmpSemver(v.version, best.version) > 0) best = v;
+    }
+  }
+  async function tryUrl(u){
+    const res = await fetch(u, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(12000),
+      headers: u.indexOf('api.github.com') >= 0 ? { 'Accept': 'application/vnd.github.raw+json' } : undefined
+    });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    let obj = null;
+    const ct = (res.headers.get('content-type') || '');
+    if (u.indexOf('api.github.com') >= 0 && ct.indexOf('json') >= 0 && ct.indexOf('raw') < 0) {
+      const meta = await res.json();
+      if (meta && meta.content) {
+        try { obj = JSON.parse(atob(String(meta.content).replace(/\n/g, ''))); } catch (e1) { obj = null; }
       }
-      if (!obj || !obj.version || !obj.url) throw new Error('bad version.json');
-      if (!best || cmpSemver(obj.version, best.version) > 0) best = obj;
-    } catch(e){ lastErr = e; }
+    } else {
+      obj = await res.json();
+    }
+    consider(obj);
+  }
+  // Prefer schedule feed (reliable CDN + pin + publishedUnix purge path), then version.json
+  const all = feedUrls.concat(verUrls);
+  for (let i=0;i<all.length;i++){
+    try { await tryUrl(all[i]); } catch(e){ lastErr = e; }
   }
   if (!best) throw lastErr || new Error('version fetch fail');
   return best;
@@ -1462,22 +1493,29 @@ async function runAppUpdate(){
       toast('피드가 예전 버전(v' + remote + ')이라 건너뜀 · 잠시 후 다시');
       return;
     }
-    const pin = (url.match(/@([0-9a-f]{7,40})\//i) || [])[1] || '';
+    const pin = String(info.commit || '').trim() || ((url.match(/@([0-9a-f]{7,40})\//i) || [])[1] || '');
     const htmlUrls = [
       url,
       pin ? ('https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@' + pin + '/app/index.html') : '',
       pin ? ('https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@' + pin + '/app/index.html') : '',
       pin ? ('https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/' + pin + '/app/index.html') : '',
       'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/app/index.html',
+      'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/app/index.html',
       'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/app/index.html'
     ].filter(function(u, i, arr){ return !!u && arr.indexOf(u) === i; });
+    // Prefer commit-pinned jsDelivr first in the list order for Android multi-try
+    htmlUrls.sort(function(a,b){
+      const score = function(u){
+        if (/jsdelivr\.net\/gh\/.*@[0-9a-f]{7,}/i.test(u)) return 0;
+        if (u.indexOf('jsdelivr.net') >= 0) return 1;
+        if (u.indexOf('fastly.jsdelivr') >= 0) return 2;
+        return 3;
+      };
+      return score(a) - score(b);
+    });
     if (hasAndroidBridge() && GoodjobAndroid.downloadAppUpdate){
       toast('앱 v' + remote + ' 받는 중…');
-      // Prefer commit-pinned jsDelivr (raw@main CDN often stale on phones)
-      var prefer = htmlUrls.find(function(u){ return /jsdelivr\.net\/gh\/.*@[0-9a-f]{7,}/i.test(u); })
-        || htmlUrls.find(function(u){ return u.indexOf('jsdelivr.net') >= 0; })
-        || htmlUrls[0];
-      GoodjobAndroid.downloadAppUpdate(prefer);
+      GoodjobAndroid.downloadAppUpdate(htmlUrls.join('|'));
       return;
     }
     if (btn) btn.textContent = '⏳ 받는중…';
@@ -1528,7 +1566,7 @@ function formatKSTHtml(ms){
   const y=get('year'), mo=get('month'), d=get('day');
   const hh=get('hour'), mm=get('minute'), ss=get('second');
   const msec = pad3(Math.floor(ms % 1000));
-  return y+'. '+Number(mo)+'. '+Number(d)+'. <span class="hm">'+hh+'</span>:<span class="hm">'+mm+'</span>:<span class="sec">'+ss+'</span>.'+msec;
+  return y+'. '+Number(mo)+'. '+Number(d)+'. '+hh+':<span class="min">'+mm+'</span>:<span class="sec">'+ss+'</span>.'+msec;
 }
 function tick(){
   const el = document.getElementById('srvClock');
