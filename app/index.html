@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=4, user-scalable=yes"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=4, user-scalable=yes, viewport-fit=cover"/>
 <title>Good Job - 무공해차 통합누리집 보조금 접수 달력, 서버시간, 초연습</title>
 <style>
 :root{
@@ -19,8 +19,8 @@ body{
   -webkit-font-smoothing:antialiased; font-size:14px; line-height:1.35;
 }
 a{color:#1d4ed8;text-decoration:none}
-.wrap{max-width:1080px;margin:0 auto;padding:12px 12px 40px}
-.bar{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 14px;position:sticky;top:8px;z-index:40}
+.wrap{max-width:1080px;margin:0 auto;padding:max(12px, env(safe-area-inset-top, 0px)) 12px 40px}
+.bar{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 14px;position:sticky;top:max(8px, env(safe-area-inset-top, 0px));z-index:40}
 .bar h1{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em}
 .bar .sub.tip{margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.4}
 .bar .sub.tip.muted{opacity:.9}
@@ -629,7 +629,7 @@ const HOLIDAYS = {"2026-01-01": "신정", "2026-02-16": "설 연휴", "2026-02-1
 var LIVE = DATA;
 let DEALER = {};
 let rows = (LIVE && LIVE.rows) ? LIVE.rows.slice() : [];
-const APP_VER = "1.1.10";
+const APP_VER = "1.1.11";
 const APP_VER_RAW = 'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/version.json';
 const APP_VER_CDN = 'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_CDN2 = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
