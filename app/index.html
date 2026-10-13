@@ -629,7 +629,7 @@ const HOLIDAYS = {"2026-01-01": "신정", "2026-02-16": "설 연휴", "2026-02-1
 var LIVE = DATA;
 let DEALER = {};
 let rows = (LIVE && LIVE.rows) ? LIVE.rows.slice() : [];
-const APP_VER = "1.1.11";
+const APP_VER = "1.1.12";
 const APP_VER_RAW = 'https://raw.githubusercontent.com/jcurvelab-dot/goodjob-ev-calendar/main/version.json';
 const APP_VER_CDN = 'https://cdn.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
 const APP_VER_CDN2 = 'https://fastly.jsdelivr.net/gh/jcurvelab-dot/goodjob-ev-calendar@main/version.json';
@@ -729,11 +729,28 @@ async function fetchRemoteSchedule(force){
   return { ok: false, error: lastErr };
 }
 let mode = 'all';
-let year = 2026, month = 8;
+let year, month;
 let selectedDate = null;
 let selectedRegion = null;
 let selectedEvent = null; // {row, kind}
 let popEl = null;
+// v1.1.12: open on TODAY (KST, server-synced clock) instead of a hard-coded month (was 2026-09, no selection).
+let userNavigated = false;      // user moved month / picked a day in this session -> do not yank back
+let hiddenAtMs = 0;
+function kstTodayParts(){
+  let off = 0;
+  try { off = clockOffsetSec || 0; } catch(e) {}   // clock sync may not be initialised yet (declared later)
+  const d = new Date(Date.now() + off*1000 + 9*3600000);
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth(), d: d.getUTCDate() };
+}
+function kstTodayStr(){ const t = kstTodayParts(); return ymd(t.y, t.m+1, t.d); }
+function goToday(){
+  const t = kstTodayParts();
+  year = t.y; month = t.m;
+  selectedDate = ymd(t.y, t.m+1, t.d);
+  selectedRegion = null;
+}
+goToday();
 const MAX_CHIPS = 4;
 const qEl = document.getElementById('q');
 const stEl = document.getElementById('st');
@@ -1018,8 +1035,7 @@ function renderCal(){
   const startDow = first.getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const prevDays = new Date(year, month, 0).getDate();
-  const now = new Date();
-  const todayStr = ymd(now.getFullYear(), now.getMonth()+1, now.getDate());
+  const todayStr = kstTodayStr();
   const cells = [];
   const dows = ['일','월','화','수','목','금','토'];
   for (let i=0;i<7;i++) cells.push('<div class="dow '+(i===0?'sun':i===6?'sat':'')+'">'+dows[i]+'</div>');
@@ -1059,6 +1075,7 @@ function renderCal(){
         return;
       }
       // date select → show that day's regions at bottom; clear region-only filter
+      userNavigated = true;
       selectedDate = (selectedDate===ds && !selectedRegion) ? null : ds;
       selectedRegion = null;
       selectedEvent = null;
@@ -1085,8 +1102,8 @@ function renderCal(){
 
 function renderAll(){ closePop(); renderCal(); renderCards(); }
 
-document.getElementById('prev').onclick = function(){ month--; if(month<0){month=11;year--;} renderCal(); };
-document.getElementById('next').onclick = function(){ month++; if(month>11){month=0;year++;} renderCal(); };
+document.getElementById('prev').onclick = function(){ userNavigated = true; month--; if(month<0){month=11;year--;} renderCal(); };
+document.getElementById('next').onclick = function(){ userNavigated = true; month++; if(month>11){month=0;year++;} renderCal(); };
 document.querySelectorAll('.tab').forEach(function(btn){
   btn.onclick = function(){
     document.querySelectorAll('.tab').forEach(function(b){ b.classList.remove('on'); });
@@ -1744,7 +1761,17 @@ async function syncNavyism(){
   clockOffsetSec = 0;
   if (status) status.innerHTML = 'PC 한국시각 · <a href="'+navyUrl+'" target="_blank" rel="noopener">서버시각 원본</a>';
 }
-syncNavyism();
+syncNavyism().then(function(){
+  // server clock known now: if the device clock put us on another day, re-centre on the real KST today
+  if (!userNavigated && kstTodayStr() !== selectedDate){ goToday(); try { renderAll(); } catch(e) {} }
+}).catch(function(){});
+document.addEventListener('visibilitychange', function(){
+  if (document.hidden){ hiddenAtMs = Date.now(); return; }
+  // app brought back to the foreground after a while (or on a new day) -> show today again
+  if ((hiddenAtMs && Date.now() - hiddenAtMs > 5*60*1000) || kstTodayStr() !== selectedDate && !userNavigated){
+    userNavigated = false; goToday(); try { renderAll(); } catch(e) {}
+  }
+});
 
 function updateFooterMeta(){
   document.getElementById('genAt').textContent = publishedLabel(LIVE) || (LIVE && LIVE.generatedAt) || '';
